@@ -70,3 +70,4 @@ Required GitHub Secrets:
 - `/public` - Static assets
 - `Dockerfile` - Docker configuration
 - `next.config.js` - Next.js configuration
+# myPersonalWebsite
