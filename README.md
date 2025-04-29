@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Next.js Docker AWS Project
 
-## Getting Started
+This is a Next.js application that runs in a Docker container and is deployed to AWS using CDK.
 
-First, run the development server:
+## Prerequisites
 
+- Node.js 18 or later
+- Docker
+- AWS CLI configured with appropriate credentials
+- AWS CDK CLI
+
+## Local Development
+
+1. Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Run the development server:
+```bash
+npm run dev
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Docker
 
-## Learn More
+Build the Docker image:
+```bash
+docker build -t nextjs-docker-aws .
+```
 
-To learn more about Next.js, take a look at the following resources:
+Run the container locally:
+```bash
+docker run -p 3000:3000 nextjs-docker-aws
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Install AWS CDK dependencies:
+```bash
+cd infrastructure
+npm install
+```
 
-## Deploy on Vercel
+2. Deploy the infrastructure:
+```bash
+cdk deploy
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. Note the ECR repository URI and Load Balancer DNS from the output.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## CI/CD
+
+The project includes a GitHub Actions workflow that:
+1. Builds and tests the application
+2. Builds the Docker image
+3. Pushes the image to ECR
+4. Deploys to ECS Fargate
+
+Required GitHub Secrets:
+- AWS_ACCESS_KEY_ID
+- AWS_SECRET_ACCESS_KEY
+
+## Project Structure
+
+- `/app` - Next.js application code
+- `/infrastructure` - AWS CDK infrastructure code
+- `/.github/workflows` - CI/CD pipeline configuration
+- `/public` - Static assets
+- `Dockerfile` - Docker configuration
+- `next.config.js` - Next.js configuration
