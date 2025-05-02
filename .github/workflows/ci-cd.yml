@@ -38,6 +38,7 @@ jobs:
         aws-region: us-east-2
         role-session-name: GitHubActionsSession
         role-duration-seconds: 3600
+        audience: sts.amazonaws.com
     
     - name: Login to Amazon ECR
       id: login-ecr
@@ -90,6 +91,7 @@ jobs:
         aws-region: us-east-2
         role-session-name: GitHubActionsSession
         role-duration-seconds: 3600
+        audience: sts.amazonaws.com
     
     - name: Install infrastructure dependencies
       run: |
