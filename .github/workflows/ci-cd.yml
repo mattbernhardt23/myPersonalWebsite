@@ -3,12 +3,15 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  build-and-test:
+  build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
     
     steps:
     - uses: actions/checkout@v3
@@ -28,5 +31,68 @@ jobs:
     - name: Build application
       run: npm run build
     
-    - name: Build Docker image
-      run: docker build -t nextjs-docker-aws . 
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::761018876037:role/github-actions-role
+        aws-region: us-east-2
+    
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+    
+    - name: Build and tag Docker image
+      run: |
+        docker build --platform linux/amd64 -t nextjs-app .
+        docker tag nextjs-app:latest 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:latest
+    
+    - name: Push image to Amazon ECR
+      run: docker push 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:latest
+
+  approval:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+    - name: Wait for approval
+      uses: trstringer/manual-approval@v1
+      with:
+        secret: ${{ github.token }}
+        approvers: matthewbernhardt
+        minimum-approvals: 1
+        issue-title: "Deployment Approval Required"
+        issue-body: "Please review and approve the deployment of the latest image to production."
+
+  deploy:
+    needs: approval
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install AWS CDK
+      run: npm install -g aws-cdk
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::761018876037:role/github-actions-role
+        aws-region: us-east-2
+    
+    - name: Install infrastructure dependencies
+      run: |
+        cd infrastructure
+        npm ci
+    
+    - name: Deploy service stack
+      run: |
+        cd infrastructure
+        npx cdk deploy NextjsDockerAwsServiceStack --require-approval never
