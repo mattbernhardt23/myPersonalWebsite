@@ -60,7 +60,7 @@ jobs:
       uses: trstringer/manual-approval@v1
       with:
         secret: ${{ github.token }}
-        approvers: matthewbernhardt23
+        approvers: mattbernhardt23
         minimum-approvals: 1
         issue-title: "Deployment Approval Required"
         issue-body: "Please review and approve the deployment of the latest image to production."
