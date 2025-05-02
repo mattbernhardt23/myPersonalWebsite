@@ -55,15 +55,17 @@ jobs:
   approval:
     needs: build-and-push
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-    - name: Wait for approval
-      uses: trstringer/manual-approval@v1
-      with:
-        secret: ${{ github.token }}
-        approvers: mattbernhardt23
-        minimum-approvals: 1
-        issue-title: "Deployment Approval Required"
-        issue-body: "Please review and approve the deployment of the latest image to production."
+      - name: Wait for approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.token }}
+          approvers: mattbernhardt23
+          minimum-approvals: 1
+          issue-title: "Deployment Approval Required"
+          issue-body: "Please review and approve the deployment of the latest image to production."
 
   deploy:
     needs: approval
