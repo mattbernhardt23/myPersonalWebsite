@@ -6,6 +6,8 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.image-tag.outputs.IMAGE_TAG }}
     permissions:
       id-token: write
       contents: read
@@ -44,14 +46,21 @@ jobs:
 
       - name: Build and tag Docker image
         run: |
+          echo "Building Docker image with commit SHA: ${{ github.sha }}"
           docker build --platform linux/amd64 -t nextjs-app .
           docker tag nextjs-app:latest 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:${{ github.sha }}
           docker tag nextjs-app:latest 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:latest
+          echo "Tagged images:"
+          docker images | grep nextjs-docker-aws
 
       - name: Push image to Amazon ECR
         run: |
           docker push 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:${{ github.sha }}
           docker push 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:latest
+
+      - name: Output image tag
+        id: image-tag
+        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_OUTPUT
 
   deploy:
     needs: build-and-push
@@ -88,5 +97,6 @@ jobs:
 
       - name: Deploy service stack
         run: |
+          echo "Deploying with image tag: ${{ needs.build-and-push.outputs.image-tag }}"
           cd infrastructure
-          npx cdk deploy NextjsDockerAwsServiceStack --require-approval never --context imageTag=${{ github.sha }}
+          npx cdk deploy NextjsDockerAwsServiceStack --require-approval never --context imageTag=${{ needs.build-and-push.outputs.image-tag }}
