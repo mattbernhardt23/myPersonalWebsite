@@ -27,12 +27,14 @@ const infrastructureStack = new InfrastructureStack(app, 'NextjsDockerAwsStack',
 });
 
 // Create service stack
+const imageTag = app.node.tryGetContext('imageTag');
 const serviceStack = new ServiceStack(app, 'NextjsDockerAwsServiceStack', {
   env: { account: '761018876037', region: 'us-east-2' },
   vpc: vpc,
   cluster: infrastructureStack.cluster,
   targetGroup: infrastructureStack.targetGroup,
   securityGroup: infrastructureStack.securityGroup,
+  imageTag: imageTag,
 });
 
 app.synth();

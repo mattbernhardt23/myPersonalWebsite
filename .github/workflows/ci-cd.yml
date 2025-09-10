@@ -45,10 +45,13 @@ jobs:
       - name: Build and tag Docker image
         run: |
           docker build --platform linux/amd64 -t nextjs-app .
+          docker tag nextjs-app:latest 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:${{ github.sha }}
           docker tag nextjs-app:latest 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:latest
 
       - name: Push image to Amazon ECR
-        run: docker push 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:latest
+        run: |
+          docker push 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:${{ github.sha }}
+          docker push 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:latest
 
   deploy:
     needs: build-and-push
@@ -86,4 +89,4 @@ jobs:
       - name: Deploy service stack
         run: |
           cd infrastructure
-          npx cdk deploy NextjsDockerAwsServiceStack --require-approval never
+          npx cdk deploy NextjsDockerAwsServiceStack --require-approval never --context imageTag=${{ github.sha }}

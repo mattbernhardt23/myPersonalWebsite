@@ -11,6 +11,7 @@ export interface ServiceStackProps extends cdk.StackProps {
   cluster: ecs.ICluster;
   targetGroup: elbv2.IApplicationTargetGroup;
   securityGroup: ec2.ISecurityGroup;
+  imageTag?: string;
 }
 
 export class ServiceStack extends cdk.Stack {
@@ -56,8 +57,9 @@ export class ServiceStack extends cdk.Stack {
     });
 
     // Add container to task definition
+    const imageTag = props.imageTag || 'latest';
     const container = taskDefinition.addContainer('NextjsContainer', {
-      image: ecs.ContainerImage.fromEcrRepository(repository, 'latest'),
+      image: ecs.ContainerImage.fromEcrRepository(repository, imageTag),
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'nextjs-docker-aws' }),
     });
 
