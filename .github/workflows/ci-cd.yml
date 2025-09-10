@@ -95,8 +95,40 @@ jobs:
           cd infrastructure
           npm ci
 
+      - name: Show CDK diff
+        run: |
+          echo "Showing CDK diff with image tag: ${{ needs.build-and-push.outputs.image-tag }}"
+          cd infrastructure
+          npx cdk diff NextjsDockerAwsServiceStack --context imageTag=${{ needs.build-and-push.outputs.image-tag }}
+
       - name: Deploy service stack
         run: |
           echo "Deploying with image tag: ${{ needs.build-and-push.outputs.image-tag }}"
           cd infrastructure
           npx cdk deploy NextjsDockerAwsServiceStack --require-approval never --context imageTag=${{ needs.build-and-push.outputs.image-tag }}
+
+      - name: Check current ECS service status
+        run: |
+          echo "Current ECS service status:"
+          aws ecs describe-services \
+            --cluster nextjs-docker-aws-cluster \
+            --services $(aws ecs list-services --cluster nextjs-docker-aws-cluster --query 'serviceArns[0]' --output text | cut -d'/' -f3) \
+            --query 'services[0].{TaskDefinition:taskDefinition,RunningCount:runningCount,DesiredCount:desiredCount,Deployments:deployments}'
+
+      - name: Force ECS service update
+        run: |
+          echo "Forcing ECS service to use new task definition..."
+          SERVICE_NAME=$(aws ecs list-services --cluster nextjs-docker-aws-cluster --query 'serviceArns[0]' --output text | cut -d'/' -f3)
+          aws ecs update-service \
+            --cluster nextjs-docker-aws-cluster \
+            --service $SERVICE_NAME \
+            --force-new-deployment
+
+      - name: Wait for deployment to complete
+        run: |
+          echo "Waiting for ECS deployment to complete..."
+          SERVICE_NAME=$(aws ecs list-services --cluster nextjs-docker-aws-cluster --query 'serviceArns[0]' --output text | cut -d'/' -f3)
+          aws ecs wait services-stable \
+            --cluster nextjs-docker-aws-cluster \
+            --services $SERVICE_NAME
+          echo "Deployment completed successfully!"

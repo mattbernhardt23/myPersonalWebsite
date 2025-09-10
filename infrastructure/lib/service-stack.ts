@@ -89,6 +89,7 @@ export class ServiceStack extends cdk.Stack {
       desiredCount: 1,
       securityGroups: [serviceSecurityGroup],
       assignPublicIp: false,
+      enableExecuteCommand: true,
     });
 
     // Attach service to target group
