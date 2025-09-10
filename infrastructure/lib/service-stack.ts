@@ -20,6 +20,11 @@ export class ServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ServiceStackProps) {
     super(scope, id, props);
 
+    // Add the image tag to the stack description to ensure CDK detects changes
+    if (props.imageTag) {
+      this.templateOptions.description = `Service stack with image tag: ${props.imageTag}`;
+    }
+
     // Create ECR repository reference
     const repository = ecr.Repository.fromRepositoryName(this, 'NextjsDockerAwsRepository', 'nextjs-docker-aws');
 
@@ -56,10 +61,16 @@ export class ServiceStack extends cdk.Stack {
       taskRole: taskRole,
     });
 
-    // Add container to task definition
+    // Add image tag as a tag to ensure CDK detects changes
+    if (props.imageTag) {
+      cdk.Tags.of(taskDefinition).add('ImageTag', props.imageTag);
+    }
+
+    // Add container to task definition with image tag in construct ID
     const imageTag = props.imageTag || 'latest';
     console.log(`Using image tag: ${imageTag}`);
-    const container = taskDefinition.addContainer('NextjsContainer', {
+    const containerId = props.imageTag ? `NextjsContainer-${props.imageTag.substring(0, 8)}` : 'NextjsContainer';
+    const container = taskDefinition.addContainer(containerId, {
       image: ecs.ContainerImage.fromEcrRepository(repository, imageTag),
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'nextjs-docker-aws' }),
     });
@@ -91,6 +102,11 @@ export class ServiceStack extends cdk.Stack {
       assignPublicIp: false,
       enableExecuteCommand: true,
     });
+
+    // Add image tag as a tag to the service to ensure CDK detects changes
+    if (props.imageTag) {
+      cdk.Tags.of(this.service).add('ImageTag', props.imageTag);
+    }
 
     // Attach service to target group
     this.service.attachToApplicationTargetGroup(props.targetGroup);
