@@ -4,6 +4,7 @@ import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
+import * as customresources from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
 
 export interface ServiceStackProps extends cdk.StackProps {
@@ -53,18 +54,20 @@ export class ServiceStack extends cdk.Stack {
       resources: ['*']
     }));
 
-    // Create task definition
+    // Create task definition with image tag in family name to force new revisions
+    const taskDefinitionFamily = props.imageTag 
+      ? `nextjs-docker-aws-${props.imageTag.substring(0, 8)}`
+      : 'nextjs-docker-aws';
+    
+    console.log(`Creating task definition with family: ${taskDefinitionFamily}`);
+    
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'TaskDefinition', {
+      family: taskDefinitionFamily,
       memoryLimitMiB: 512,
       cpu: 256,
       executionRole: taskExecutionRole,
       taskRole: taskRole,
     });
-
-    // Add image tag as a tag to ensure CDK detects changes
-    if (props.imageTag) {
-      cdk.Tags.of(taskDefinition).add('ImageTag', props.imageTag);
-    }
 
     // Add container to task definition with image tag in construct ID
     const imageTag = props.imageTag || 'latest';
@@ -110,6 +113,57 @@ export class ServiceStack extends cdk.Stack {
 
     // Attach service to target group
     this.service.attachToApplicationTargetGroup(props.targetGroup);
+
+    // Create a custom resource to force service update when image tag changes
+    if (props.imageTag) {
+      const forceUpdateRole = new iam.Role(this, 'ForceUpdateRole', {
+        assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+        managedPolicies: [
+          iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+        ],
+        inlinePolicies: {
+          ECSUpdatePolicy: new iam.PolicyDocument({
+            statements: [
+              new iam.PolicyStatement({
+                effect: iam.Effect.ALLOW,
+                actions: ['ecs:UpdateService', 'ecs:DescribeServices'],
+                resources: [this.service.serviceArn],
+              }),
+            ],
+          }),
+        },
+      });
+
+      new customresources.AwsCustomResource(this, 'ForceServiceUpdate', {
+        onCreate: {
+          service: 'ECS',
+          action: 'updateService',
+          parameters: {
+            cluster: props.cluster.clusterName,
+            service: this.service.serviceName,
+            forceNewDeployment: true,
+          },
+          physicalResourceId: customresources.PhysicalResourceId.of(`force-update-${props.imageTag}`),
+        },
+        onUpdate: {
+          service: 'ECS',
+          action: 'updateService',
+          parameters: {
+            cluster: props.cluster.clusterName,
+            service: this.service.serviceName,
+            forceNewDeployment: true,
+          },
+          physicalResourceId: customresources.PhysicalResourceId.of(`force-update-${props.imageTag}`),
+        },
+        policy: customresources.AwsCustomResourcePolicy.fromStatements([
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ['ecs:UpdateService', 'ecs:DescribeServices'],
+            resources: [this.service.serviceArn],
+          }),
+        ]),
+      });
+    }
 
     // Output the service name
     new cdk.CfnOutput(this, 'ServiceName', {
