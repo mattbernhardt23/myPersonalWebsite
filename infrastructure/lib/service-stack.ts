@@ -25,6 +25,11 @@ export class ServiceStack extends cdk.Stack {
     if (props.imageTag) {
       this.templateOptions.description = `Service stack with image tag: ${props.imageTag}`;
     }
+    
+    // Add image tag as a stack tag to force CDK to detect changes
+    if (props.imageTag) {
+      cdk.Tags.of(this).add('ImageTag', props.imageTag);
+    }
 
     // Create ECR repository reference
     const repository = ecr.Repository.fromRepositoryName(this, 'NextjsDockerAwsRepository', 'nextjs-docker-aws');
@@ -54,17 +59,14 @@ export class ServiceStack extends cdk.Stack {
       resources: ['*']
     }));
 
-    // Create task definition with consistent family name
-    const taskDefinitionFamily = 'nextjs-docker-aws';
+    // Use the existing task definition family to avoid breaking the service
+    // This allows us to create new revisions instead of a new family
+    // The family name is the CDK-generated name from the original deployment
+    const taskDefinitionFamily = 'NextjsDockerAwsServiceStackTaskDefinitionA4AC537B';
     
     console.log(`Creating task definition with family: ${taskDefinitionFamily}`);
     
-    // Create task definition with image tag in construct ID to force new revisions
-    const taskDefinitionId = props.imageTag 
-      ? `TaskDefinition-${props.imageTag.substring(0, 8)}`
-      : 'TaskDefinition';
-    
-    const taskDefinition = new ecs.FargateTaskDefinition(this, taskDefinitionId, {
+    const taskDefinition = new ecs.FargateTaskDefinition(this, 'TaskDefinition', {
       family: taskDefinitionFamily,
       memoryLimitMiB: 512,
       cpu: 256,
