@@ -54,14 +54,17 @@ export class ServiceStack extends cdk.Stack {
       resources: ['*']
     }));
 
-    // Create task definition with image tag in family name to force new revisions
-    const taskDefinitionFamily = props.imageTag 
-      ? `nextjs-docker-aws-${props.imageTag.substring(0, 8)}`
-      : 'nextjs-docker-aws';
+    // Create task definition with consistent family name
+    const taskDefinitionFamily = 'nextjs-docker-aws';
     
     console.log(`Creating task definition with family: ${taskDefinitionFamily}`);
     
-    const taskDefinition = new ecs.FargateTaskDefinition(this, 'TaskDefinition', {
+    // Create task definition with image tag in construct ID to force new revisions
+    const taskDefinitionId = props.imageTag 
+      ? `TaskDefinition-${props.imageTag.substring(0, 8)}`
+      : 'TaskDefinition';
+    
+    const taskDefinition = new ecs.FargateTaskDefinition(this, taskDefinitionId, {
       family: taskDefinitionFamily,
       memoryLimitMiB: 512,
       cpu: 256,
@@ -69,11 +72,10 @@ export class ServiceStack extends cdk.Stack {
       taskRole: taskRole,
     });
 
-    // Add container to task definition with image tag in construct ID
+    // Add container to task definition with consistent container name
     const imageTag = props.imageTag || 'latest';
     console.log(`Using image tag: ${imageTag}`);
-    const containerId = props.imageTag ? `NextjsContainer-${props.imageTag.substring(0, 8)}` : 'NextjsContainer';
-    const container = taskDefinition.addContainer(containerId, {
+    const container = taskDefinition.addContainer('NextjsContainer', {
       image: ecs.ContainerImage.fromEcrRepository(repository, imageTag),
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'nextjs-docker-aws' }),
     });
@@ -96,7 +98,7 @@ export class ServiceStack extends cdk.Stack {
       'Allow inbound traffic from load balancer'
     );
 
-    // Create the ECS service
+    // Create the ECS service with consistent construct ID
     this.service = new ecs.FargateService(this, 'Service', {
       cluster: props.cluster,
       taskDefinition,
@@ -114,26 +116,8 @@ export class ServiceStack extends cdk.Stack {
     // Attach service to target group
     this.service.attachToApplicationTargetGroup(props.targetGroup);
 
-    // Create a custom resource to force service update when image tag changes
+    // Add a custom resource to ensure service updates when image tag changes
     if (props.imageTag) {
-      const forceUpdateRole = new iam.Role(this, 'ForceUpdateRole', {
-        assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-        managedPolicies: [
-          iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
-        ],
-        inlinePolicies: {
-          ECSUpdatePolicy: new iam.PolicyDocument({
-            statements: [
-              new iam.PolicyStatement({
-                effect: iam.Effect.ALLOW,
-                actions: ['ecs:UpdateService', 'ecs:DescribeServices'],
-                resources: [this.service.serviceArn],
-              }),
-            ],
-          }),
-        },
-      });
-
       new customresources.AwsCustomResource(this, 'ForceServiceUpdate', {
         onCreate: {
           service: 'ECS',
