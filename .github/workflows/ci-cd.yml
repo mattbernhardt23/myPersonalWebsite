@@ -47,7 +47,21 @@ jobs:
       - name: Build and tag Docker image
         run: |
           echo "Building Docker image with commit SHA: ${{ github.sha }}"
-          docker build --platform linux/amd64 -t nextjs-app .
+          # Retry Docker build up to 3 times in case of Docker Hub issues
+          for i in {1..3}; do
+            if docker build --platform linux/amd64 -t nextjs-app .; then
+              echo "Docker build successful on attempt $i"
+              break
+            else
+              echo "Docker build failed on attempt $i"
+              if [ $i -eq 3 ]; then
+                echo "All build attempts failed"
+                exit 1
+              fi
+              echo "Waiting 30 seconds before retry..."
+              sleep 30
+            fi
+          done
           docker tag nextjs-app:latest 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:${{ github.sha }}
           docker tag nextjs-app:latest 761018876037.dkr.ecr.us-east-2.amazonaws.com/nextjs-docker-aws:latest
           echo "Tagged images:"
